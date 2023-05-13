@@ -1,5 +1,7 @@
-import '../styles/globals.css';
 import 'instantsearch.css/themes/satellite-min.css';
+import '../styles/globals.css';
+import 'bootstrap/dist/css/bootstrap.css'
+
 
 function MyApp({ Component, pageProps }) {
   return <Component {...pageProps} />;

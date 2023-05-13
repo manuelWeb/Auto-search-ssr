@@ -1,44 +1,122 @@
-import { autocomplete } from '@algolia/autocomplete-js';
-import React, { createElement, Fragment, useEffect, useRef } from 'react';
-import { createRoot, Root } from 'react-dom/client'
+import React from "react";
+import { createElement, Fragment, useEffect, useRef, useState } from "react";
+import { render } from "react-dom";
 
-import type { AutocompleteOptions } from '@algolia/autocomplete-js'
+import { usePagination, useSearchBox } from "react-instantsearch-hooks";
+import { autocomplete, AutocompleteOptions } from "@algolia/autocomplete-js";
+import { BaseItem } from "@algolia/autocomplete-core";
 
-export function Autocomplete<TItem extends Record<string, unknown>>(
-  options: Partial<AutocompleteOptions<TItem>> &
-    Pick<React.ComponentProps<'div'>, 'className'>
-) {
-  const { className, ...props } = options;
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const panelRootRef = useRef<Root | null>(null)
-  const rootRef = useRef<HTMLElement | null>(null)
+import "@algolia/autocomplete-theme-classic";
+import { createQuerySuggestionsPlugin } from "@algolia/autocomplete-plugin-query-suggestions";
+import { createLocalStorageRecentSearchesPlugin } from "@algolia/autocomplete-plugin-recent-searches";
+import { searchClient } from "../utils/searchClient";
+import { INSTANT_SEARCH_QUERY_SUGGESTIONS } from "../constants";
+import { useRouter } from "next/router";
+
+type AutocompleteProps = Partial<AutocompleteOptions<BaseItem>> & {
+  className?: string;
+};
+
+type SetInstantSearchUiStateOptions = {
+  query: string;
+};
+
+export function Autocomplete({ className, ...autocompleteProps }: AutocompleteProps) {
+  // nextjs
+  const router = useRouter();
+
+  // algolia
+  const autocompleteContainer = useRef<HTMLDivElement>(null);
+
+  const { query, refine: setQuery } = useSearchBox();
+  const { refine: setPage } = usePagination();
+
+  const [instantSearchUiState, setInstantSearchUiState] = useState<
+    SetInstantSearchUiStateOptions
+  >({ query });
+
+  const recentSearches = createLocalStorageRecentSearchesPlugin(
+    {
+      key: "instantsearch",
+      limit: 3,
+      transformSource({ source }) {
+        return {
+          ...source,
+          onSelect({ item }) {
+            setInstantSearchUiState({
+              query: item.label
+            });
+          }
+        };
+      }
+    }
+  );
+
+  const querySuggestions = createQuerySuggestionsPlugin(
+    {
+      searchClient,
+      indexName: INSTANT_SEARCH_QUERY_SUGGESTIONS,
+      getSearchParams() {
+        return recentSearches.data!.getAlgoliaSearchParams(
+          {
+            hitsPerPage: 6
+          }
+        );
+      }
+      // transformSource({ source }) {
+      //   return {
+      //     ...source,
+      //     sourceId: "querySuggestionsPlugin",
+      //     onSelect({ item }) {
+      //       setInstantSearchUiState({ query: item.query });
+      //     },
+      //     getItems(params) {
+      //       if (!params.state.query) {
+      //         return [];
+      //       }
+      //       return source.getItems(params);
+      //     },
+      //   };
+      // }
+    }
+  );
 
   useEffect(() => {
-    if (!containerRef.current) {
-      return undefined;
+    setQuery(instantSearchUiState.query);
+    setPage(0);
+  }, [instantSearchUiState]);
+
+  useEffect(() => {
+    if (!autocompleteContainer.current) {
+      return;
     }
-    const search = autocomplete<TItem>({
-      container: containerRef.current,
-      renderer: { createElement, Fragment, render: () => { } },
-      render({ children }, root) {
-        if (!panelRootRef.current || rootRef.current !== root) {
-          rootRef.current = root;
 
-          panelRootRef.current?.unmount();
-          panelRootRef.current = createRoot(root);
-        }
-
-        panelRootRef.current.render(children);
+    const autocompleteInstance = autocomplete({
+      ...autocompleteProps,
+      container: autocompleteContainer.current,
+      initialState: { query },
+      onReset() {
+        setInstantSearchUiState({ query: "" });
       },
-      ...props,
+      onSubmit({ state }) {
+        console.log('state', state);
+        router.push(`/search?query=${encodeURIComponent(state.query)}`);
+
+        setInstantSearchUiState({ query: state.query });
+      },
+      onStateChange({ prevState, state }) {
+        if (prevState.query !== state.query) {
+          setInstantSearchUiState({
+            query: state.query
+          });
+        }
+      },
+      renderer: { createElement, Fragment, render },
+      plugins: [querySuggestions]
     });
 
-    return () => {
-      search.destroy();
-    };
-  }, [props]);
+    return () => autocompleteInstance.destroy();
+  }, []);
 
-  return <div ref={containerRef} className={className} />;
+  return <div className={className} ref={autocompleteContainer} />;
 }
-
-// [see demo](https://codesandbox.io/s/github/algolia/autocomplete/tree/next/examples/react-instantsearch-hooks?file=/src/components/Autocomplete.tsx:0-6702)
