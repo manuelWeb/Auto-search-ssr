@@ -22,8 +22,8 @@ const client = algoliasearch(APP_ID, SEARCH_API_KEY);
 
 type HitProps = {
   hit: AlgoliaHit<{
-    name: string;
-    price: number;
+    'fiche.nom': string;
+    prix: number;
   }>;
 };
 
