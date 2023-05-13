@@ -17,6 +17,7 @@ import { getServerState } from 'react-instantsearch-hooks-server';
 import { history } from 'instantsearch.js/es/lib/routers/index.js';
 import { Panel } from '../components/Panel';
 import { APP_ID, PRODUCTS_INDEX, SEARCH_API_KEY } from '../constants';
+import Layout from '../components/layout';
 
 const client = algoliasearch(APP_ID, SEARCH_API_KEY);
 
@@ -63,19 +64,23 @@ export default function HomePage({ serverState, url }: HomePageProps) {
           }),
         }}
       >
-        <header className='header'>
-          Menu
-          <SearchBox />
-        </header>
+        <Layout>
+          {/* <header className='header'>
+            Menu
+            <SearchBox searchAsYouType={false} />
+          </header> */}
 
-        <div className="Container">
-          <div>
-            <DynamicWidgets fallbackComponent={FallbackComponent} />
+          <div className="Container">
+            <div>
+              <DynamicWidgets fallbackComponent={FallbackComponent} />
+            </div>
+            <div>
+              <Hits hitComponent={Hit} />
+            </div>
           </div>
-          <div>
-            <Hits hitComponent={Hit} />
-          </div>
-        </div>
+
+        </Layout>
+
       </InstantSearch>
     </InstantSearchSSRProvider>
   );
